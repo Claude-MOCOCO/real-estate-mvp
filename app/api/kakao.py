@@ -54,8 +54,6 @@ async def _process_and_callback(
     except Exception as e:
         logger.error("콜백 처리 실패: type=%s, detail=%s, user=%s", type(e).__name__, e, kakao_user_id)
         await _send_error_callback(callback_url, kakao_user_id, "죄송해요, 처리 중 오류가 발생했어요. 다시 시도해주세요.")
-    finally:
-        await db.close()
 
 
 @router.post("/skill")

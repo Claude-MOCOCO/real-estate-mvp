@@ -43,9 +43,15 @@ class KakaoRequest(BaseModel):
     def validate_callback_url(cls, v):
         if v is None:
             return v
+        if not isinstance(v, str) or len(v) > 2048:
+            return None
         parsed = urlparse(v)
         if parsed.scheme not in ("http", "https") or not parsed.netloc:
             return None  # 유효하지 않은 URL은 무시하고 직접 응답 모드로 전환
+        # 내부 네트워크 SSRF 방지
+        host = parsed.hostname or ""
+        if host in ("localhost", "127.0.0.1", "0.0.0.0", "::1") or host.startswith("10.") or host.startswith("192.168.") or host.startswith("172."):
+            return None
         return v
 
 
