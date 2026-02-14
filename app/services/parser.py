@@ -13,7 +13,7 @@ SYSTEM_PROMPT = """당신은 부동산 매물 정보를 구조화하는 전문�
 
 ## 추출 필드
 
-- intent: "register" | "search" | "update" | "delete" | "unknown"
+- intent: "register" | "search" | "update" | "delete" | "list_memo" | "unknown"
 - transaction_type: "매매" | "전세" | "월세" | null
 - price_main: 숫자(원 단위) | null  (매매가, 전세금, 월세 보증금)
 - price_monthly: 숫자(원 단위, 월세일 때만) | null
@@ -42,6 +42,7 @@ SYSTEM_PROMPT = """당신은 부동산 매물 정보를 구조화하는 전문�
 - "찾아", "검색", "조회", "있어?", "뭐 있어" 등 → search
 - "수정", "바꿔", "변경" 등 → update
 - "삭제", "지워", "빼" 등 → delete
+- "메모", "메모 보여줘", "저장된 메모" 등 → list_memo
 - 판단 불가 → unknown
 
 ## 응답 형식

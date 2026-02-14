@@ -9,12 +9,15 @@ from app.services.parser import parser
 from app.services.property_service import (
     create_memo,
     create_property_from_parse,
+    delete_property,
     get_or_create_agent,
+    list_memos,
     list_properties,
     search_properties,
 )
 from app.services.responder import (
-    format_confirm_message,
+    format_property_summary,
+    format_registered_summary,
     format_search_results,
 )
 
@@ -39,7 +42,9 @@ async def handle_utterance(db: AsyncSession, kakao_user_id: str, utterance: str)
     elif parsed.intent == "update":
         return _handle_update(parsed)
     elif parsed.intent == "delete":
-        return _handle_delete(parsed)
+        return await _handle_delete(db, agent.id, parsed)
+    elif parsed.intent == "list_memo":
+        return await _handle_list_memo(db, agent.id)
     else:
         return await _handle_unknown(db, agent.id, parsed, utterance)
 
@@ -60,10 +65,10 @@ async def _handle_register(db, agent_id, parsed: ParseResult, raw_input: str) ->
             f"나머지 정보: {_summarize_parsed(parsed)}"
         )
 
-    # MVP: 바로 등록 후 확인 메시지 표시
+    # MVP: 바로 등록 후 등록 완료 요약 표시
     prop = await create_property_from_parse(db, agent_id, parsed, raw_input)
-    confirm = format_confirm_message(parsed, raw_input)
-    return f"매물이 등록됐어요!\n\n{confirm}\n\n(매물 ID: {str(prop.id)[:8]})"
+    summary = format_registered_summary(parsed)
+    return f"매물이 등록됐어요!\n\n{summary}\n\n수정이 필요하면 말씀해주세요."
 
 
 async def _handle_search(db, agent_id, parsed: ParseResult) -> str:
@@ -90,12 +95,38 @@ def _handle_update(parsed: ParseResult) -> str:
     )
 
 
-def _handle_delete(parsed: ParseResult) -> str:
-    """매물 삭제 — MVP에서는 안내만"""
-    return (
-        "매물 삭제는 아직 준비 중이에요.\n"
-        "삭제가 필요하시면 관리자에게 문의해주세요."
-    )
+async def _handle_delete(db, agent_id, parsed: ParseResult) -> str:
+    """매물 삭제 — 조건에 맞는 매물을 찾아서 삭제"""
+
+    # 조건으로 매물 검색
+    matches = await search_properties(db, agent_id, parsed)
+
+    if not matches:
+        return "삭제할 매물을 찾지 못했어요. 조건을 다시 확인해주세요."
+
+    if len(matches) == 1:
+        prop = matches[0]
+        await delete_property(db, agent_id, prop.id)
+        return f"매물이 삭제됐어요.\n\n삭제된 매물: {format_property_summary(prop)}"
+
+    # 여러 건이면 목록 보여주고 특정 요청 안내
+    lines = [f"조건에 맞는 매물이 {len(matches)}건이에요. 좀 더 구체적으로 알려주세요.\n"]
+    for i, prop in enumerate(matches[:5], 1):
+        lines.append(f"{i}. {format_property_summary(prop)}")
+    return "\n".join(lines)
+
+
+async def _handle_list_memo(db, agent_id) -> str:
+    """저장된 메모 목록 조회"""
+    memos = await list_memos(db, agent_id, resolved=False)
+    if not memos:
+        return "저장된 메모가 없어요."
+
+    lines = [f"저장된 메모 {len(memos)}건이에요.\n"]
+    for i, memo in enumerate(memos[:10], 1):
+        content_preview = memo.content[:40] + ("..." if len(memo.content) > 40 else "")
+        lines.append(f"{i}. {content_preview}")
+    return "\n".join(lines)
 
 
 async def _handle_unknown(db, agent_id, parsed: ParseResult, raw_input: str) -> str:

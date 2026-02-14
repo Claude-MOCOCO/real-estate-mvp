@@ -67,7 +67,7 @@ class PropertyResponse(BaseModel):
 class ParseResult(BaseModel):
     """AI 파싱 결과"""
 
-    intent: Literal["register", "search", "update", "delete", "unknown"] = "unknown"
+    intent: Literal["register", "search", "update", "delete", "list_memo", "unknown"] = "unknown"
     transaction_type: str | None = None
     price_main: int | None = None
     price_monthly: int | None = None

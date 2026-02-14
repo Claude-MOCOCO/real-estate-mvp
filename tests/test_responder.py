@@ -1,7 +1,7 @@
 """응답 포맷터 테스트"""
 
 from app.schemas.property import ParseResult
-from app.services.responder import format_confirm_message, format_price
+from app.services.responder import format_registered_summary, format_price
 
 
 def test_format_price_eok():
@@ -20,7 +20,7 @@ def test_format_price_none():
     assert format_price(None) == "-"
 
 
-def test_format_confirm_message():
+def test_format_registered_summary():
     parsed = ParseResult(
         intent="register",
         transaction_type="전세",
@@ -30,14 +30,14 @@ def test_format_confirm_message():
         address_dong="역삼동",
         confidence=0.85,
     )
-    result = format_confirm_message(parsed, "강남구 역삼동 30평 전세 3억")
+    result = format_registered_summary(parsed)
     assert "전세" in result
     assert "3억" in result
     assert "30" in result
     assert "강남구" in result
 
 
-def test_format_confirm_message_with_monthly():
+def test_format_registered_summary_with_monthly():
     parsed = ParseResult(
         intent="register",
         transaction_type="월세",
@@ -46,7 +46,7 @@ def test_format_confirm_message_with_monthly():
         address_gugun="서초구",
         confidence=0.8,
     )
-    result = format_confirm_message(parsed, "서초구 월세 1000/50")
+    result = format_registered_summary(parsed)
     assert "월세" in result
     assert "1,000만원" in result
     assert "50만원" in result

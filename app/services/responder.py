@@ -37,9 +37,9 @@ def format_property_summary(prop: Property) -> str:
     return " ".join(parts)
 
 
-def format_confirm_message(parsed: ParseResult, raw_input: str) -> str:
-    """등록 확인 메시지 생성"""
-    lines = ["아래 내용으로 매물을 등록할까요?\n"]
+def format_registered_summary(parsed: ParseResult) -> str:
+    """등록 완료 요약 메시지 생성"""
+    lines = []
 
     if parsed.transaction_type:
         lines.append(f"거래유형: {parsed.transaction_type}")
@@ -71,12 +71,8 @@ def format_confirm_message(parsed: ParseResult, raw_input: str) -> str:
             lines.append(f"기타: {', '.join(extras)}")
 
     if parsed.missing_fields:
-        lines.append(f"\n* 누락된 정보: {', '.join(parsed.missing_fields)}")
+        lines.append(f"\n* 추가하면 좋을 정보: {', '.join(parsed.missing_fields)}")
 
-    if parsed.clarification_needed:
-        lines.append(f"\n{parsed.clarification_needed}")
-
-    lines.append("\n'네' 또는 '등록'이라고 답해주시면 저장됩니다.")
     return "\n".join(lines)
 
 
