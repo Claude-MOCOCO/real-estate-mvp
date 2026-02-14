@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -6,6 +7,7 @@ from fastapi.responses import JSONResponse
 from app.api.health import router as health_router
 from app.api.kakao import router as kakao_router
 from app.api.properties import router as properties_router
+from app.core.database import engine
 from app.schemas.kakao import KakaoResponse
 
 logger = logging.getLogger(__name__)
@@ -15,10 +17,20 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("부동산 개인비서 MVP 시작")
+    yield
+    logger.info("부동산 개인비서 MVP 종료 — DB 커넥션 풀 정리")
+    await engine.dispose()
+
+
 app = FastAPI(
     title="부동산 개인비서 MVP",
     description="공인중개사 전용 AI 비서 — 카카오톡 채널봇 + FastAPI",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 

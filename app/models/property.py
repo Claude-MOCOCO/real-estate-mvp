@@ -1,16 +1,22 @@
 import uuid
 
-from sqlalchemy import BigInteger, ForeignKey, Numeric, String, Text
+from sqlalchemy import BigInteger, ForeignKey, Index, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
+from app.schemas.property import PropertyStatus
 
 
 class Property(UUIDMixin, TimestampMixin, Base):
     """매물 테이블 (하이브리드 구조: 정형 컬럼 + JSONB)"""
 
     __tablename__ = "properties"
+    __table_args__ = (
+        Index("ix_properties_agent_status", "agent_id", "status"),
+        Index("ix_properties_agent_status_type", "agent_id", "status", "transaction_type"),
+        Index("ix_properties_agent_status_gugun", "agent_id", "status", "address_gugun"),
+    )
 
     agent_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False, index=True
@@ -32,7 +38,9 @@ class Property(UUIDMixin, TimestampMixin, Base):
     # 원문 보존 (파싱 검증용)
     raw_input: Mapped[str | None] = mapped_column(Text)
 
-    status: Mapped[str] = mapped_column(String(10), server_default="active", default="active")
+    status: Mapped[str] = mapped_column(
+        String(10), server_default=PropertyStatus.ACTIVE.value, default=PropertyStatus.ACTIVE.value
+    )
 
     # Relationships
     agent: Mapped["Agent"] = relationship(back_populates="properties")  # noqa: F821

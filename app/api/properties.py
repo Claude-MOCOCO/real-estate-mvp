@@ -27,9 +27,11 @@ async def get_properties(
     agent_id: uuid.UUID,
     transaction_type: str | None = None,
     address_gugun: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
     db: AsyncSession = Depends(get_db),
 ):
-    return await list_properties(db, agent_id, transaction_type, address_gugun)
+    return await list_properties(db, agent_id, transaction_type, address_gugun, limit=limit, offset=offset)
 
 
 @router.post("/{agent_id}", response_model=PropertyResponse, status_code=201)

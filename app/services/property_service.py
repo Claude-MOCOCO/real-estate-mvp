@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.agent import Agent
 from app.models.memo import Memo
 from app.models.property import Property
-from app.schemas.property import MemoCreate, ParseResult, PropertyCreate, PropertyUpdate
+from app.schemas.property import MemoCreate, ParseResult, PropertyCreate, PropertyStatus, PropertyUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +80,11 @@ async def list_properties(
     agent_id: uuid.UUID,
     transaction_type: str | None = None,
     address_gugun: str | None = None,
-    status: str = "active",
+    status: str = PropertyStatus.ACTIVE.value,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[Property]:
-    """매물 목록 조회 (개인화 격리: agent_id 필수)"""
+    """매물 목록 조회 (개인화 격리: agent_id 필수, 페이지네이션 적용)"""
     query = select(Property).where(
         Property.agent_id == agent_id,
         Property.status == status,
@@ -92,7 +94,7 @@ async def list_properties(
     if address_gugun:
         query = query.where(Property.address_gugun == address_gugun)
 
-    query = query.order_by(Property.created_at.desc())
+    query = query.order_by(Property.created_at.desc()).offset(offset).limit(limit)
     result = await db.execute(query)
     return list(result.scalars().all())
 
@@ -136,7 +138,7 @@ async def delete_property(
     prop = await get_property(db, agent_id, property_id)
     if prop is None:
         return False
-    prop.status = "deleted"
+    prop.status = PropertyStatus.DELETED.value
     await db.commit()
     logger.info("매물 삭제: id=%s, agent=%s", property_id, agent_id)
     return True
@@ -153,7 +155,7 @@ async def search_properties(
     """파싱 결과 기반 매물 검색"""
     query = select(Property).where(
         Property.agent_id == agent_id,
-        Property.status == "active",
+        Property.status == PropertyStatus.ACTIVE.value,
     )
 
     if parsed.transaction_type:
@@ -210,11 +212,12 @@ async def create_memo(
 
 
 async def list_memos(
-    db: AsyncSession, agent_id: uuid.UUID, resolved: bool = False
+    db: AsyncSession, agent_id: uuid.UUID, resolved: bool = False, limit: int = 50
 ) -> list[Memo]:
     result = await db.execute(
         select(Memo)
         .where(Memo.agent_id == agent_id, Memo.resolved == resolved)
         .order_by(Memo.created_at.desc())
+        .limit(limit)
     )
     return list(result.scalars().all())

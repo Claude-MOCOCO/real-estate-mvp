@@ -19,7 +19,7 @@ class PropertyStatus(str, Enum):
 
 
 class PropertyCreate(BaseModel):
-    transaction_type: str | None = None
+    transaction_type: TransactionType | None = None
     price_main: int | None = Field(None, ge=0)
     price_monthly: int | None = Field(None, ge=0)
     area_pyeong: float | None = Field(None, gt=0)
@@ -32,7 +32,7 @@ class PropertyCreate(BaseModel):
 
 
 class PropertyUpdate(BaseModel):
-    transaction_type: str | None = None
+    transaction_type: TransactionType | None = None
     price_main: int | None = Field(None, ge=0)
     price_monthly: int | None = Field(None, ge=0)
     area_pyeong: float | None = Field(None, gt=0)
@@ -41,7 +41,7 @@ class PropertyUpdate(BaseModel):
     address_dong: str | None = None
     building_name: str | None = None
     extra: dict | None = None
-    status: str | None = None
+    status: PropertyStatus | None = None
 
 
 class PropertyResponse(BaseModel):
@@ -57,7 +57,7 @@ class PropertyResponse(BaseModel):
     building_name: str | None
     extra: dict
     raw_input: str | None
-    status: str
+    status: PropertyStatus
     created_at: datetime
     updated_at: datetime
 

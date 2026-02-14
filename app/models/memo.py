@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, String, Text
+from sqlalchemy import Boolean, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
@@ -11,6 +11,9 @@ class Memo(UUIDMixin, TimestampMixin, Base):
     """메모 테이블 (파싱 실패 시 임시 저장)"""
 
     __tablename__ = "memos"
+    __table_args__ = (
+        Index("ix_memos_agent_resolved", "agent_id", "resolved"),
+    )
 
     agent_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False, index=True
