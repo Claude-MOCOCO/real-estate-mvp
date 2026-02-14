@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class KakaoUser(BaseModel):
@@ -9,7 +9,7 @@ class KakaoUser(BaseModel):
 class KakaoUserRequest(BaseModel):
     timezone: str = "Asia/Seoul"
     block: dict = {}
-    utterance: str = ""
+    utterance: str = Field(default="", max_length=1000)
     lang: str = "ko"
     params: dict = {}
 

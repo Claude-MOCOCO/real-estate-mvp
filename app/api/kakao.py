@@ -1,5 +1,6 @@
 """카카오 챗봇 스킬 서버 엔드포인트"""
 
+import asyncio
 import logging
 
 import httpx
@@ -17,17 +18,28 @@ router = APIRouter(prefix="/kakao", tags=["kakao"])
 async def _process_and_callback(
     callback_url: str, kakao_user_id: str, utterance: str
 ):
-    """비동기 처리 후 콜백 URL로 응답 전송 (독립 DB 세션 사용)"""
+    """비동기 처리 후 콜백 URL로 응답 전송 (독립 DB 세션 사용, 30초 타임아웃)"""
     db = await get_new_session()
     try:
         async with db:
-            response_text = await handle_utterance(db, kakao_user_id, utterance)
+            response_text = await asyncio.wait_for(
+                handle_utterance(db, kakao_user_id, utterance),
+                timeout=25.0,
+            )
             kakao_response = KakaoResponse.text(response_text)
 
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(callback_url, json=kakao_response.model_dump(exclude_none=True))
                 logger.info("콜백 전송 완료: status=%d, user=%s", resp.status_code, kakao_user_id)
 
+    except asyncio.TimeoutError:
+        logger.error("백그라운드 처리 타임아웃(25초): user=%s", kakao_user_id)
+        try:
+            error_response = KakaoResponse.text("처리 시간이 초과됐어요. 잠시 후 다시 시도해주세요.")
+            async with httpx.AsyncClient(timeout=5) as client:
+                await client.post(callback_url, json=error_response.model_dump(exclude_none=True))
+        except Exception:
+            logger.error("타임아웃 에러 콜백 실패: user=%s", kakao_user_id)
     except Exception as e:
         logger.error("콜백 처리 실패: %s, user=%s", e, kakao_user_id)
         try:
@@ -50,7 +62,10 @@ async def kakao_skill(
     콜백 URL이 없으면: 직접 응답 (5초 제한 내)
     """
     utterance = request.userRequest.utterance
-    kakao_user_id = request.userRequest.params.get("plusfriendUserKey", "unknown")
+    kakao_user_id = request.userRequest.params.get("plusfriendUserKey", "")
+
+    if not kakao_user_id or len(kakao_user_id) > 100:
+        return KakaoResponse.text("사용자 인증에 실패했어요. 다시 시도해주세요.").model_dump(exclude_none=True)
 
     if not utterance.strip():
         return KakaoResponse.text("말씀해주세요! 매물 등록이나 검색을 도와드릴게요.").model_dump(exclude_none=True)

@@ -132,6 +132,11 @@ async def delete_property(
     return True
 
 
+def _escape_like(value: str) -> str:
+    r"""LIKE 쿼리 특수문자(%, _, \) 이스케이프"""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 async def search_properties(
     db: AsyncSession, agent_id: uuid.UUID, parsed: ParseResult
 ) -> list[Property]:
@@ -148,7 +153,8 @@ async def search_properties(
     if parsed.address_dong:
         query = query.where(Property.address_dong == parsed.address_dong)
     if parsed.building_name:
-        query = query.where(Property.building_name.ilike(f"%{parsed.building_name}%"))
+        escaped = _escape_like(parsed.building_name)
+        query = query.where(Property.building_name.ilike(f"%{escaped}%"))
     if parsed.area_pyeong:
         query = query.where(
             Property.area_pyeong.between(parsed.area_pyeong - 5, parsed.area_pyeong + 5)
@@ -167,6 +173,22 @@ async def search_properties(
 async def create_memo(
     db: AsyncSession, agent_id: uuid.UUID, data: MemoCreate
 ) -> Memo:
+    # 최근 1시간 내 동일 내용 메모 중복 방지
+    from datetime import datetime, timedelta, timezone
+
+    one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+    result = await db.execute(
+        select(Memo).where(
+            Memo.agent_id == agent_id,
+            Memo.content == data.content,
+            Memo.created_at >= one_hour_ago,
+        )
+    )
+    existing_memo = result.scalar_one_or_none()
+    if existing_memo:
+        logger.info("중복 메모 저장 스킵: agent=%s", agent_id)
+        return existing_memo
+
     memo = Memo(agent_id=agent_id, content=data.content)
     db.add(memo)
     await db.commit()
