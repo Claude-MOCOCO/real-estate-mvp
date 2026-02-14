@@ -1,7 +1,7 @@
 import json
 import logging
 
-from openai import APIConnectionError, AsyncOpenAI, RateLimitError
+from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, RateLimitError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
@@ -84,7 +84,7 @@ class PropertyParser:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=5),
-        retry=retry_if_exception_type((RateLimitError, APIConnectionError)),
+        retry=retry_if_exception_type((RateLimitError, APIConnectionError, APITimeoutError)),
         reraise=True,
     )
     async def _call_openai(self, user_input: str):

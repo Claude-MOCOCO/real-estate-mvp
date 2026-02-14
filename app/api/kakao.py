@@ -70,6 +70,7 @@ async def kakao_skill(
     utterance = request.userRequest.utterance
     kakao_user_id = request.userRequest.params.get("plusfriendUserKey", "")
 
+    kakao_user_id = kakao_user_id.strip()
     if not kakao_user_id or len(kakao_user_id) > 100:
         return KakaoResponse.text("사용자 인증에 실패했어요. 다시 시도해주세요.").model_dump(exclude_none=True)
 

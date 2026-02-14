@@ -23,12 +23,12 @@ class PropertyCreate(BaseModel):
     price_main: int | None = Field(None, ge=0)
     price_monthly: int | None = Field(None, ge=0)
     area_pyeong: float | None = Field(None, gt=0)
-    address_sido: str | None = None
-    address_gugun: str | None = None
-    address_dong: str | None = None
-    building_name: str | None = None
-    extra: dict = {}
-    raw_input: str | None = None
+    address_sido: str | None = Field(None, max_length=20)
+    address_gugun: str | None = Field(None, max_length=20)
+    address_dong: str | None = Field(None, max_length=30)
+    building_name: str | None = Field(None, max_length=50)
+    extra: dict = Field(default_factory=dict)
+    raw_input: str | None = Field(None, max_length=1000)
 
 
 class PropertyUpdate(BaseModel):
@@ -36,10 +36,10 @@ class PropertyUpdate(BaseModel):
     price_main: int | None = Field(None, ge=0)
     price_monthly: int | None = Field(None, ge=0)
     area_pyeong: float | None = Field(None, gt=0)
-    address_sido: str | None = None
-    address_gugun: str | None = None
-    address_dong: str | None = None
-    building_name: str | None = None
+    address_sido: str | None = Field(None, max_length=20)
+    address_gugun: str | None = Field(None, max_length=20)
+    address_dong: str | None = Field(None, max_length=30)
+    building_name: str | None = Field(None, max_length=50)
     extra: dict | None = None
     status: PropertyStatus | None = None
 
@@ -76,14 +76,14 @@ class ParseResult(BaseModel):
     address_gugun: str | None = None
     address_dong: str | None = None
     building_name: str | None = None
-    extra: dict = {}
-    missing_fields: list[str] = []
+    extra: dict = Field(default_factory=dict)
+    missing_fields: list[str] = Field(default_factory=list)
     confidence: float = Field(0.0, ge=0.0, le=1.0)
     clarification_needed: str | None = None
 
 
 class MemoCreate(BaseModel):
-    content: str
+    content: str = Field(..., min_length=1, max_length=5000)
 
 
 class MemoResponse(BaseModel):
