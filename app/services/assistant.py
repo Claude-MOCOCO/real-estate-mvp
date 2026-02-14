@@ -84,17 +84,18 @@ async def _handle_search(db, agent_id, parsed: ParseResult) -> str:
     """매물 검색 처리"""
 
     # 아무 조건 없이 검색하면 전체 목록
-    if not any([
+    is_full_list = not any([
         parsed.transaction_type, parsed.address_gugun,
         parsed.address_dong, parsed.building_name,
         parsed.area_pyeong, parsed.price_main,
-    ]):
+    ])
+    if is_full_list:
         properties = await list_properties(db, agent_id)
     else:
         properties = await search_properties(db, agent_id, parsed)
 
     logger.info("검색 결과: %d건, agent=%s", len(properties), agent_id)
-    return format_search_results(properties)
+    return format_search_results(properties, is_full_list=is_full_list)
 
 
 def _handle_update(parsed: ParseResult) -> str:

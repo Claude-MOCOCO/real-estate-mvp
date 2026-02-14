@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field
+from urllib.parse import urlparse
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class KakaoUser(BaseModel):
@@ -35,6 +37,16 @@ class KakaoRequest(BaseModel):
     bot: KakaoBot = KakaoBot()
     action: KakaoAction = KakaoAction()
     callbackUrl: str | None = None
+
+    @field_validator("callbackUrl", mode="before")
+    @classmethod
+    def validate_callback_url(cls, v):
+        if v is None:
+            return v
+        parsed = urlparse(v)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return None  # 유효하지 않은 URL은 무시하고 직접 응답 모드로 전환
+        return v
 
 
 class KakaoSimpleText(BaseModel):

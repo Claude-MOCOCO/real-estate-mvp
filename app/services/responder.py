@@ -34,7 +34,7 @@ def format_property_summary(prop: Property) -> str:
         parts.append(format_price(prop.price_main))
     if prop.price_monthly:
         parts.append(f"/ 월 {format_price(prop.price_monthly)}")
-    return " ".join(parts)
+    return " ".join(parts) if parts else "(정보 없음)"
 
 
 def format_registered_summary(parsed: ParseResult) -> str:
@@ -76,16 +76,17 @@ def format_registered_summary(parsed: ParseResult) -> str:
     return "\n".join(lines)
 
 
-def format_search_results(properties: list[Property]) -> str:
+def format_search_results(properties: list[Property], is_full_list: bool = False) -> str:
     if not properties:
+        if is_full_list:
+            return "등록된 매물이 없어요. 매물을 등록해보세요!\n\n예시: '강남구 역삼동 30평 전세 3억 등록해줘'"
         return "조건에 맞는 매물이 없어요."
 
-    lines = [f"총 {len(properties)}건의 매물을 찾았어요.\n"]
+    label = "등록된" if is_full_list else "찾은"
+    lines = [f"총 {len(properties)}건의 {label} 매물이에요.\n"]
     for i, prop in enumerate(properties, 1):
         lines.append(f"{i}. {format_property_summary(prop)}")
 
     return "\n".join(lines)
 
 
-def format_delete_confirm(prop: Property) -> str:
-    return f"아래 매물을 삭제할까요?\n\n{format_property_summary(prop)}\n\n'네' 또는 '삭제'라고 답해주시면 삭제됩니다."

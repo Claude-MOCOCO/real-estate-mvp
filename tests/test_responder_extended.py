@@ -1,9 +1,8 @@
-"""응답 포맷터 확장 테스트 — format_property_summary, format_search_results, format_delete_confirm"""
+"""응답 포맷터 확장 테스트 — format_property_summary, format_search_results"""
 
 from unittest.mock import MagicMock
 
 from app.services.responder import (
-    format_delete_confirm,
     format_price,
     format_property_summary,
     format_search_results,
@@ -64,11 +63,17 @@ def test_format_property_summary_monthly():
 def test_format_property_summary_minimal():
     prop = _mock_property()
     result = format_property_summary(prop)
-    assert result == ""
+    assert result == "(정보 없음)"
 
 
 def test_format_search_results_empty():
     assert format_search_results([]) == "조건에 맞는 매물이 없어요."
+
+
+def test_format_search_results_empty_full_list():
+    result = format_search_results([], is_full_list=True)
+    assert "등록된 매물이 없어요" in result
+    assert "등록해보세요" in result
 
 
 def test_format_search_results_multiple():
@@ -78,14 +83,17 @@ def test_format_search_results_multiple():
     ]
     result = format_search_results(props)
     assert "총 2건" in result
+    assert "찾은" in result
     assert "1." in result
     assert "2." in result
     assert "강남구" in result
     assert "서초구" in result
 
 
-def test_format_delete_confirm():
-    prop = _mock_property(transaction_type="전세", address_gugun="강남구", price_main=300000000)
-    result = format_delete_confirm(prop)
-    assert "삭제할까요" in result
-    assert "강남구" in result
+def test_format_search_results_full_list():
+    props = [
+        _mock_property(transaction_type="전세", address_gugun="강남구", price_main=300000000),
+    ]
+    result = format_search_results(props, is_full_list=True)
+    assert "총 1건" in result
+    assert "등록된" in result
