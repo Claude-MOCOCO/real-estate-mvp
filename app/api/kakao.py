@@ -6,7 +6,7 @@ import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import get_db, get_new_session
 from app.schemas.kakao import KakaoRequest, KakaoResponse
 from app.services.assistant import handle_utterance
 
@@ -15,16 +15,18 @@ router = APIRouter(prefix="/kakao", tags=["kakao"])
 
 
 async def _process_and_callback(
-    callback_url: str, kakao_user_id: str, utterance: str, db: AsyncSession
+    callback_url: str, kakao_user_id: str, utterance: str
 ):
-    """비동기 처리 후 콜백 URL로 응답 전송"""
+    """비동기 처리 후 콜백 URL로 응답 전송 (독립 DB 세션 사용)"""
+    db = await get_new_session()
     try:
-        response_text = await handle_utterance(db, kakao_user_id, utterance)
-        kakao_response = KakaoResponse.text(response_text)
+        async with db:
+            response_text = await handle_utterance(db, kakao_user_id, utterance)
+            kakao_response = KakaoResponse.text(response_text)
 
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(callback_url, json=kakao_response.model_dump(exclude_none=True))
-            logger.info("콜백 전송 완료: status=%d, user=%s", resp.status_code, kakao_user_id)
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(callback_url, json=kakao_response.model_dump(exclude_none=True))
+                logger.info("콜백 전송 완료: status=%d, user=%s", resp.status_code, kakao_user_id)
 
     except Exception as e:
         logger.error("콜백 처리 실패: %s, user=%s", e, kakao_user_id)
@@ -50,16 +52,17 @@ async def kakao_skill(
     utterance = request.userRequest.utterance
     kakao_user_id = request.userRequest.params.get("plusfriendUserKey", "unknown")
 
+    if not utterance.strip():
+        return KakaoResponse.text("말씀해주세요! 매물 등록이나 검색을 도와드릴게요.").model_dump(exclude_none=True)
+
     logger.info("스킬 요청: user=%s, utterance=%s", kakao_user_id, utterance[:50])
 
     if request.callbackUrl:
-        # 콜백 모드: 즉시 대기 메시지 반환 + 비동기 처리
         background_tasks.add_task(
             _process_and_callback,
-            request.callbackUrl, kakao_user_id, utterance, db,
+            request.callbackUrl, kakao_user_id, utterance,
         )
         return KakaoResponse.callback_pending().model_dump(exclude_none=True)
 
-    # 직접 응답 모드 (단순 조회 등)
     response_text = await handle_utterance(db, kakao_user_id, utterance)
     return KakaoResponse.text(response_text).model_dump(exclude_none=True)

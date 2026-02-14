@@ -1,14 +1,28 @@
 import uuid
 from datetime import datetime
+from enum import Enum
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class TransactionType(str, Enum):
+    SALE = "매매"
+    JEONSE = "전세"
+    MONTHLY = "월세"
+
+
+class PropertyStatus(str, Enum):
+    ACTIVE = "active"
+    SOLD = "sold"
+    DELETED = "deleted"
 
 
 class PropertyCreate(BaseModel):
     transaction_type: str | None = None
-    price_main: int | None = None
-    price_monthly: int | None = None
-    area_pyeong: float | None = None
+    price_main: int | None = Field(None, ge=0)
+    price_monthly: int | None = Field(None, ge=0)
+    area_pyeong: float | None = Field(None, gt=0)
     address_sido: str | None = None
     address_gugun: str | None = None
     address_dong: str | None = None
@@ -19,9 +33,9 @@ class PropertyCreate(BaseModel):
 
 class PropertyUpdate(BaseModel):
     transaction_type: str | None = None
-    price_main: int | None = None
-    price_monthly: int | None = None
-    area_pyeong: float | None = None
+    price_main: int | None = Field(None, ge=0)
+    price_monthly: int | None = Field(None, ge=0)
+    area_pyeong: float | None = Field(None, gt=0)
     address_sido: str | None = None
     address_gugun: str | None = None
     address_dong: str | None = None
@@ -53,7 +67,7 @@ class PropertyResponse(BaseModel):
 class ParseResult(BaseModel):
     """AI 파싱 결과"""
 
-    intent: str  # register, search, update, delete, unknown
+    intent: Literal["register", "search", "update", "delete", "unknown"] = "unknown"
     transaction_type: str | None = None
     price_main: int | None = None
     price_monthly: int | None = None
@@ -64,7 +78,7 @@ class ParseResult(BaseModel):
     building_name: str | None = None
     extra: dict = {}
     missing_fields: list[str] = []
-    confidence: float = 0.0
+    confidence: float = Field(0.0, ge=0.0, le=1.0)
     clarification_needed: str | None = None
 
 

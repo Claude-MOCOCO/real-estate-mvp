@@ -1,6 +1,8 @@
+import logging
 import uuid
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.agent import Agent
@@ -8,17 +10,26 @@ from app.models.memo import Memo
 from app.models.property import Property
 from app.schemas.property import MemoCreate, ParseResult, PropertyCreate, PropertyUpdate
 
+logger = logging.getLogger(__name__)
+
 
 async def get_or_create_agent(db: AsyncSession, kakao_user_id: str) -> Agent:
-    """카카오 사용자 ID로 Agent 조회 또는 생성"""
+    """카카오 사용자 ID로 Agent 조회 또는 생성 (race condition 방어)"""
     result = await db.execute(
         select(Agent).where(Agent.kakao_user_id == kakao_user_id)
     )
     agent = result.scalar_one_or_none()
     if agent is None:
-        agent = Agent(kakao_user_id=kakao_user_id)
-        db.add(agent)
-        await db.flush()
+        try:
+            agent = Agent(kakao_user_id=kakao_user_id)
+            db.add(agent)
+            await db.flush()
+        except IntegrityError:
+            await db.rollback()
+            result = await db.execute(
+                select(Agent).where(Agent.kakao_user_id == kakao_user_id)
+            )
+            agent = result.scalar_one()
     return agent
 
 

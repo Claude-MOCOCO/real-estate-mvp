@@ -80,6 +80,7 @@ class PropertyParser:
         return self._client
 
     async def parse(self, user_input: str) -> ParseResult:
+        content = None
         try:
             response = await self.client.chat.completions.create(
                 model=settings.openai_model,
@@ -93,6 +94,8 @@ class PropertyParser:
             )
 
             content = response.choices[0].message.content
+            if not content:
+                raise ValueError("AI 응답이 비어있습니다")
             data = json.loads(content)
             return ParseResult(**data)
 
