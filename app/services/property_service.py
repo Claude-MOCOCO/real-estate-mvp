@@ -1,5 +1,6 @@
 import logging
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -204,8 +205,6 @@ async def create_memo(
     db: AsyncSession, agent_id: uuid.UUID, data: MemoCreate
 ) -> tuple[Memo, bool]:
     """메모 생성. 반환: (memo, is_new) — is_new=False면 중복 스킵됨"""
-    from datetime import datetime, timedelta, timezone
-
     one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
     result = await db.execute(
         select(Memo).where(
