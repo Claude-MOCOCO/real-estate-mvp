@@ -25,6 +25,3 @@ Thumbs.db
 venv/
 .venv/
 env/
-
-# Config (실제 값 포함)
-config/*.json

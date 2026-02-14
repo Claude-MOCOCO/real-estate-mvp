@@ -1,0 +1,174 @@
+import uuid
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.agent import Agent
+from app.models.memo import Memo
+from app.models.property import Property
+from app.schemas.property import MemoCreate, ParseResult, PropertyCreate, PropertyUpdate
+
+
+async def get_or_create_agent(db: AsyncSession, kakao_user_id: str) -> Agent:
+    """카카오 사용자 ID로 Agent 조회 또는 생성"""
+    result = await db.execute(
+        select(Agent).where(Agent.kakao_user_id == kakao_user_id)
+    )
+    agent = result.scalar_one_or_none()
+    if agent is None:
+        agent = Agent(kakao_user_id=kakao_user_id)
+        db.add(agent)
+        await db.flush()
+    return agent
+
+
+async def create_property(
+    db: AsyncSession, agent_id: uuid.UUID, data: PropertyCreate
+) -> Property:
+    prop = Property(agent_id=agent_id, **data.model_dump())
+    db.add(prop)
+    await db.commit()
+    await db.refresh(prop)
+    return prop
+
+
+async def create_property_from_parse(
+    db: AsyncSession, agent_id: uuid.UUID, parsed: ParseResult, raw_input: str
+) -> Property:
+    """파싱 결과로 매물 생성"""
+    prop = Property(
+        agent_id=agent_id,
+        transaction_type=parsed.transaction_type,
+        price_main=parsed.price_main,
+        price_monthly=parsed.price_monthly,
+        area_pyeong=parsed.area_pyeong,
+        address_sido=parsed.address_sido,
+        address_gugun=parsed.address_gugun,
+        address_dong=parsed.address_dong,
+        building_name=parsed.building_name,
+        extra=parsed.extra,
+        raw_input=raw_input,
+    )
+    db.add(prop)
+    await db.commit()
+    await db.refresh(prop)
+    return prop
+
+
+async def list_properties(
+    db: AsyncSession,
+    agent_id: uuid.UUID,
+    transaction_type: str | None = None,
+    address_gugun: str | None = None,
+    status: str = "active",
+) -> list[Property]:
+    """매물 목록 조회 (개인화 격리: agent_id 필수)"""
+    query = select(Property).where(
+        Property.agent_id == agent_id,
+        Property.status == status,
+    )
+    if transaction_type:
+        query = query.where(Property.transaction_type == transaction_type)
+    if address_gugun:
+        query = query.where(Property.address_gugun == address_gugun)
+
+    query = query.order_by(Property.created_at.desc())
+    result = await db.execute(query)
+    return list(result.scalars().all())
+
+
+async def get_property(
+    db: AsyncSession, agent_id: uuid.UUID, property_id: uuid.UUID
+) -> Property | None:
+    """매물 단건 조회 (개인화 격리)"""
+    result = await db.execute(
+        select(Property).where(
+            Property.id == property_id,
+            Property.agent_id == agent_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def update_property(
+    db: AsyncSession,
+    agent_id: uuid.UUID,
+    property_id: uuid.UUID,
+    data: PropertyUpdate,
+) -> Property | None:
+    prop = await get_property(db, agent_id, property_id)
+    if prop is None:
+        return None
+
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(prop, key, value)
+
+    await db.commit()
+    await db.refresh(prop)
+    return prop
+
+
+async def delete_property(
+    db: AsyncSession, agent_id: uuid.UUID, property_id: uuid.UUID
+) -> bool:
+    """소프트 삭제"""
+    prop = await get_property(db, agent_id, property_id)
+    if prop is None:
+        return False
+    prop.status = "deleted"
+    await db.commit()
+    return True
+
+
+async def search_properties(
+    db: AsyncSession, agent_id: uuid.UUID, parsed: ParseResult
+) -> list[Property]:
+    """파싱 결과 기반 매물 검색"""
+    query = select(Property).where(
+        Property.agent_id == agent_id,
+        Property.status == "active",
+    )
+
+    if parsed.transaction_type:
+        query = query.where(Property.transaction_type == parsed.transaction_type)
+    if parsed.address_gugun:
+        query = query.where(Property.address_gugun == parsed.address_gugun)
+    if parsed.address_dong:
+        query = query.where(Property.address_dong == parsed.address_dong)
+    if parsed.building_name:
+        query = query.where(Property.building_name.ilike(f"%{parsed.building_name}%"))
+    if parsed.area_pyeong:
+        query = query.where(
+            Property.area_pyeong.between(parsed.area_pyeong - 5, parsed.area_pyeong + 5)
+        )
+    if parsed.price_main:
+        margin = int(parsed.price_main * 0.2)
+        query = query.where(
+            Property.price_main.between(parsed.price_main - margin, parsed.price_main + margin)
+        )
+
+    query = query.order_by(Property.created_at.desc()).limit(20)
+    result = await db.execute(query)
+    return list(result.scalars().all())
+
+
+async def create_memo(
+    db: AsyncSession, agent_id: uuid.UUID, data: MemoCreate
+) -> Memo:
+    memo = Memo(agent_id=agent_id, content=data.content)
+    db.add(memo)
+    await db.commit()
+    await db.refresh(memo)
+    return memo
+
+
+async def list_memos(
+    db: AsyncSession, agent_id: uuid.UUID, resolved: bool = False
+) -> list[Memo]:
+    result = await db.execute(
+        select(Memo)
+        .where(Memo.agent_id == agent_id, Memo.resolved == resolved)
+        .order_by(Memo.created_at.desc())
+    )
+    return list(result.scalars().all())
