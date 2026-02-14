@@ -133,8 +133,14 @@ async def update_property(
     if prop is None:
         return None
 
+    UPDATABLE_FIELDS = {
+        "transaction_type", "price_main", "price_monthly", "area_pyeong",
+        "address_sido", "address_gugun", "address_dong", "building_name", "extra",
+    }
     update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
+        if key not in UPDATABLE_FIELDS:
+            continue
         setattr(prop, key, value)
 
     try:

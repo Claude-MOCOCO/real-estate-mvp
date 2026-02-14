@@ -68,9 +68,9 @@ class ParseResult(BaseModel):
 
     intent: Literal["register", "search", "update", "delete", "list_memo", "unknown"] = "unknown"
     transaction_type: str | None = None
-    price_main: int | None = None
-    price_monthly: int | None = None
-    area_pyeong: float | None = None
+    price_main: int | None = Field(None, ge=0, le=10**12)
+    price_monthly: int | None = Field(None, ge=0, le=10**9)
+    area_pyeong: float | None = Field(None, gt=0, le=10000)
     address_sido: str | None = Field(None, max_length=20)
     address_gugun: str | None = Field(None, max_length=20)
     address_dong: str | None = Field(None, max_length=30)
