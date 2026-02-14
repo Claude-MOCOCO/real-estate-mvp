@@ -83,7 +83,7 @@ async def kakao_skill(
             _process_and_callback,
             request.callbackUrl, kakao_user_id, utterance,
         )
-        return KakaoResponse.callback_pending().model_dump(exclude_none=True)
+        return KakaoResponse.callback_pending(utterance).model_dump(exclude_none=True)
 
     response_text = await handle_utterance(db, kakao_user_id, utterance)
     return KakaoResponse.text(response_text).model_dump(exclude_none=True)

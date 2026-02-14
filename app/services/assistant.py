@@ -23,6 +23,12 @@ from app.services.responder import (
 
 logger = logging.getLogger(__name__)
 
+# UX 상수
+CONFIDENCE_THRESHOLD = 0.3
+MAX_DELETE_OPTIONS = 5
+MEMO_PREVIEW_LENGTH = 40
+MAX_MEMO_DISPLAY = 10
+
 
 async def handle_utterance(db: AsyncSession, kakao_user_id: str, utterance: str) -> str:
     """사용자 발화를 처리하고 응답 텍스트를 반환"""
@@ -54,7 +60,7 @@ async def handle_utterance(db: AsyncSession, kakao_user_id: str, utterance: str)
 async def _handle_register(db, agent_id, parsed: ParseResult, raw_input: str) -> str:
     """매물 등록 처리 — MVP에서는 확인 단계 없이 바로 등록 (확인 저장 원칙은 Phase 2)"""
 
-    if parsed.confidence < 0.3:
+    if parsed.confidence < CONFIDENCE_THRESHOLD:
         return (
             "말씀하신 내용에서 매물 정보를 충분히 파악하지 못했어요.\n"
             "예시: '강남구 역삼동 30평 전세 3억 아파트 등록해줘'"
@@ -115,7 +121,7 @@ async def _handle_delete(db, agent_id, parsed: ParseResult) -> str:
 
     # 여러 건이면 목록 보여주고 특정 요청 안내
     lines = [f"조건에 맞는 매물이 {len(matches)}건이에요. 좀 더 구체적으로 알려주세요.\n"]
-    for i, prop in enumerate(matches[:5], 1):
+    for i, prop in enumerate(matches[:MAX_DELETE_OPTIONS], 1):
         lines.append(f"{i}. {format_property_summary(prop)}")
     return "\n".join(lines)
 
@@ -127,8 +133,8 @@ async def _handle_list_memo(db, agent_id) -> str:
         return "저장된 메모가 없어요."
 
     lines = [f"저장된 메모 {len(memos)}건이에요.\n"]
-    for i, memo in enumerate(memos[:10], 1):
-        content_preview = memo.content[:40] + ("..." if len(memo.content) > 40 else "")
+    for i, memo in enumerate(memos[:MAX_MEMO_DISPLAY], 1):
+        content_preview = memo.content[:MEMO_PREVIEW_LENGTH] + ("..." if len(memo.content) > MEMO_PREVIEW_LENGTH else "")
         lines.append(f"{i}. {content_preview}")
     return "\n".join(lines)
 
@@ -139,14 +145,23 @@ async def _handle_unknown(db, agent_id, parsed: ParseResult, raw_input: str) -> 
     if parsed.clarification_needed:
         return parsed.clarification_needed
 
-    # 메모로 저장
-    await create_memo(db, agent_id, MemoCreate(content=raw_input))
-    return (
-        "말씀하신 내용을 매물 정보로 이해하지 못했어요.\n"
-        "메모로 저장해뒀으니, 나중에 다시 정리할 수 있어요.\n\n"
-        "매물 등록 예시: '강남구 역삼동 30평 전세 3억 등록해줘'\n"
-        "매물 검색 예시: '역삼동 월세 뭐 있어?'"
-    )
+    # 메모로 저장 (중복 시 is_new=False)
+    _memo, is_new = await create_memo(db, agent_id, MemoCreate(content=raw_input))
+
+    if is_new:
+        return (
+            "말씀하신 내용을 매물 정보로 이해하지 못했어요.\n"
+            "메모로 저장해뒀으니, 나중에 다시 정리할 수 있어요.\n\n"
+            "매물 등록 예시: '강남구 역삼동 30평 전세 3억 등록해줘'\n"
+            "매물 검색 예시: '역삼동 월세 뭐 있어?'"
+        )
+    else:
+        return (
+            "같은 내용이 이미 메모에 저장돼 있어요.\n"
+            "메모 확인: '저장된 메모 보여줘'\n\n"
+            "매물 등록 예시: '강남구 역삼동 30평 전세 3억 등록해줘'\n"
+            "매물 검색 예시: '역삼동 월세 뭐 있어?'"
+        )
 
 
 def _summarize_parsed(parsed: ParseResult) -> str:

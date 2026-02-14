@@ -12,6 +12,11 @@ from app.schemas.property import MemoCreate, ParseResult, PropertyCreate, Proper
 
 logger = logging.getLogger(__name__)
 
+# 검색 상수
+SEARCH_MAX_RESULTS = 20
+PRICE_MARGIN_RATIO = 0.2
+AREA_MARGIN_PYEONG = 5.0
+
 
 async def get_or_create_agent(db: AsyncSession, kakao_user_id: str) -> Agent:
     """카카오 사용자 ID로 Agent 조회 또는 생성 (race condition 방어)"""
@@ -162,23 +167,26 @@ async def search_properties(
         query = query.where(Property.building_name.ilike(f"%{escaped}%"))
     if parsed.area_pyeong:
         query = query.where(
-            Property.area_pyeong.between(parsed.area_pyeong - 5, parsed.area_pyeong + 5)
+            Property.area_pyeong.between(
+                parsed.area_pyeong - AREA_MARGIN_PYEONG,
+                parsed.area_pyeong + AREA_MARGIN_PYEONG,
+            )
         )
     if parsed.price_main:
-        margin = int(parsed.price_main * 0.2)
+        margin = int(parsed.price_main * PRICE_MARGIN_RATIO)
         query = query.where(
             Property.price_main.between(parsed.price_main - margin, parsed.price_main + margin)
         )
 
-    query = query.order_by(Property.created_at.desc()).limit(20)
+    query = query.order_by(Property.created_at.desc()).limit(SEARCH_MAX_RESULTS)
     result = await db.execute(query)
     return list(result.scalars().all())
 
 
 async def create_memo(
     db: AsyncSession, agent_id: uuid.UUID, data: MemoCreate
-) -> Memo:
-    # 최근 1시간 내 동일 내용 메모 중복 방지
+) -> tuple[Memo, bool]:
+    """메모 생성. 반환: (memo, is_new) — is_new=False면 중복 스킵됨"""
     from datetime import datetime, timedelta, timezone
 
     one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
@@ -192,13 +200,13 @@ async def create_memo(
     existing_memo = result.scalar_one_or_none()
     if existing_memo:
         logger.info("중복 메모 저장 스킵: agent=%s", agent_id)
-        return existing_memo
+        return existing_memo, False
 
     memo = Memo(agent_id=agent_id, content=data.content)
     db.add(memo)
     await db.commit()
     await db.refresh(memo)
-    return memo
+    return memo, True
 
 
 async def list_memos(

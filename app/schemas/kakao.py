@@ -66,16 +66,27 @@ class KakaoResponse(BaseModel):
         )
 
     @classmethod
-    def callback_pending(cls) -> "KakaoResponse":
-        """콜백 대기 응답 — 비동기 처리 시작"""
+    def callback_pending(cls, utterance: str = "") -> "KakaoResponse":
+        """콜백 대기 응답 — 발화 내용에 따라 맞춤 대기 메시지"""
+        # 발화 내용 기반으로 대기 메시지 결정
+        lower = utterance.strip()
+        if any(kw in lower for kw in ("등록", "추가", "넣어", "올려")):
+            message = "매물 등록 중이에요... 잠시만요!"
+        elif any(kw in lower for kw in ("찾아", "검색", "조회", "있어", "뭐 있")):
+            message = "매물을 찾고 있어요... 곧 알려드릴게요!"
+        elif any(kw in lower for kw in ("삭제", "지워", "빼")):
+            message = "매물을 확인하고 있어요..."
+        elif any(kw in lower for kw in ("메모", "저장")):
+            message = "메모를 확인하고 있어요..."
+        else:
+            message = "잠시만요, 확인 중입니다..."
+
         return cls(
             useCallback=True,
             template=KakaoTemplate(
                 outputs=[
                     KakaoOutput(
-                        simpleText=KakaoSimpleText(
-                            text="잠시만요, 확인 중입니다..."
-                        )
+                        simpleText=KakaoSimpleText(text=message)
                     )
                 ]
             ),
