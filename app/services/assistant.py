@@ -16,6 +16,7 @@ from app.services.property_service import (
     search_properties,
 )
 from app.services.responder import (
+    format_price,
     format_property_summary,
     format_registered_summary,
     format_search_results,
@@ -123,6 +124,8 @@ async def _handle_delete(db, agent_id, parsed: ParseResult) -> str:
     lines = [f"조건에 맞는 매물이 {len(matches)}건이에요. 좀 더 구체적으로 알려주세요.\n"]
     for i, prop in enumerate(matches[:MAX_DELETE_OPTIONS], 1):
         lines.append(f"{i}. {format_property_summary(prop)}")
+    if len(matches) > MAX_DELETE_OPTIONS:
+        lines.append(f"\n(외 {len(matches) - MAX_DELETE_OPTIONS}건 — 조건을 더 구체적으로 입력해주세요)")
     return "\n".join(lines)
 
 
@@ -136,6 +139,8 @@ async def _handle_list_memo(db, agent_id) -> str:
     for i, memo in enumerate(memos[:MAX_MEMO_DISPLAY], 1):
         content_preview = memo.content[:MEMO_PREVIEW_LENGTH] + ("..." if len(memo.content) > MEMO_PREVIEW_LENGTH else "")
         lines.append(f"{i}. {content_preview}")
+    if len(memos) > MAX_MEMO_DISPLAY:
+        lines.append(f"\n(외 {len(memos) - MAX_MEMO_DISPLAY}건 더 있음)")
     return "\n".join(lines)
 
 
@@ -173,7 +178,7 @@ def _summarize_parsed(parsed: ParseResult) -> str:
     if parsed.area_pyeong:
         parts.append(f"{parsed.area_pyeong}평")
     if parsed.price_main:
-        parts.append(f"{parsed.price_main:,}원")
+        parts.append(format_price(parsed.price_main))
     if parsed.building_name:
         parts.append(parsed.building_name)
     return ", ".join(parts) if parts else "(추출된 정보 없음)"

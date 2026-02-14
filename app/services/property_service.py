@@ -43,36 +43,46 @@ async def get_or_create_agent(db: AsyncSession, kakao_user_id: str) -> Agent:
 async def create_property(
     db: AsyncSession, agent_id: uuid.UUID, data: PropertyCreate
 ) -> Property:
-    prop = Property(agent_id=agent_id, **data.model_dump())
-    db.add(prop)
-    await db.commit()
-    await db.refresh(prop)
-    logger.info("매물 생성: id=%s, agent=%s", prop.id, agent_id)
-    return prop
+    try:
+        prop = Property(agent_id=agent_id, **data.model_dump())
+        db.add(prop)
+        await db.commit()
+        await db.refresh(prop)
+        logger.info("매물 생성: id=%s, agent=%s", prop.id, agent_id)
+        return prop
+    except IntegrityError as e:
+        await db.rollback()
+        logger.error("매물 생성 실패 (제약조건): agent=%s, error=%s", agent_id, e)
+        raise
 
 
 async def create_property_from_parse(
     db: AsyncSession, agent_id: uuid.UUID, parsed: ParseResult, raw_input: str
 ) -> Property:
     """파싱 결과로 매물 생성"""
-    prop = Property(
-        agent_id=agent_id,
-        transaction_type=parsed.transaction_type,
-        price_main=parsed.price_main,
-        price_monthly=parsed.price_monthly,
-        area_pyeong=parsed.area_pyeong,
-        address_sido=parsed.address_sido,
-        address_gugun=parsed.address_gugun,
-        address_dong=parsed.address_dong,
-        building_name=parsed.building_name,
-        extra=parsed.extra,
-        raw_input=raw_input,
-    )
-    db.add(prop)
-    await db.commit()
-    await db.refresh(prop)
-    logger.info("매물 등록(파싱): id=%s, agent=%s, type=%s", prop.id, agent_id, parsed.transaction_type)
-    return prop
+    try:
+        prop = Property(
+            agent_id=agent_id,
+            transaction_type=parsed.transaction_type,
+            price_main=parsed.price_main,
+            price_monthly=parsed.price_monthly,
+            area_pyeong=parsed.area_pyeong,
+            address_sido=parsed.address_sido,
+            address_gugun=parsed.address_gugun,
+            address_dong=parsed.address_dong,
+            building_name=parsed.building_name,
+            extra=parsed.extra,
+            raw_input=raw_input,
+        )
+        db.add(prop)
+        await db.commit()
+        await db.refresh(prop)
+        logger.info("매물 등록(파싱): id=%s, agent=%s, type=%s", prop.id, agent_id, parsed.transaction_type)
+        return prop
+    except IntegrityError as e:
+        await db.rollback()
+        logger.error("매물 등록 실패 (제약조건): agent=%s, error=%s", agent_id, e)
+        raise
 
 
 async def list_properties(
@@ -126,9 +136,14 @@ async def update_property(
     for key, value in update_data.items():
         setattr(prop, key, value)
 
-    await db.commit()
-    await db.refresh(prop)
-    return prop
+    try:
+        await db.commit()
+        await db.refresh(prop)
+        return prop
+    except IntegrityError as e:
+        await db.rollback()
+        logger.error("매물 수정 실패 (제약조건): id=%s, agent=%s, error=%s", property_id, agent_id, e)
+        raise
 
 
 async def delete_property(
@@ -204,11 +219,16 @@ async def create_memo(
         logger.info("중복 메모 저장 스킵: agent=%s", agent_id)
         return existing_memo, False
 
-    memo = Memo(agent_id=agent_id, content=data.content)
-    db.add(memo)
-    await db.commit()
-    await db.refresh(memo)
-    return memo, True
+    try:
+        memo = Memo(agent_id=agent_id, content=data.content)
+        db.add(memo)
+        await db.commit()
+        await db.refresh(memo)
+        return memo, True
+    except IntegrityError as e:
+        await db.rollback()
+        logger.error("메모 생성 실패 (제약조건): agent=%s, error=%s", agent_id, e)
+        raise
 
 
 async def list_memos(

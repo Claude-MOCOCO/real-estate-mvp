@@ -5,7 +5,7 @@ from app.schemas.property import ParseResult
 
 
 def format_price(amount: int | None) -> str:
-    if amount is None:
+    if amount is None or amount == 0:
         return "-"
     eok = amount // 100_000_000
     man = (amount % 100_000_000) // 10_000
