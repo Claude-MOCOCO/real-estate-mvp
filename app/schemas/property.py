@@ -41,7 +41,6 @@ class PropertyUpdate(BaseModel):
     address_dong: str | None = Field(None, max_length=30)
     building_name: str | None = Field(None, max_length=50)
     extra: dict | None = None
-    status: PropertyStatus | None = None
 
 
 class PropertyResponse(BaseModel):
@@ -72,10 +71,10 @@ class ParseResult(BaseModel):
     price_main: int | None = None
     price_monthly: int | None = None
     area_pyeong: float | None = None
-    address_sido: str | None = None
-    address_gugun: str | None = None
-    address_dong: str | None = None
-    building_name: str | None = None
+    address_sido: str | None = Field(None, max_length=20)
+    address_gugun: str | None = Field(None, max_length=20)
+    address_dong: str | None = Field(None, max_length=30)
+    building_name: str | None = Field(None, max_length=50)
     extra: dict = Field(default_factory=dict)
     missing_fields: list[str] = Field(default_factory=list)
     confidence: float = Field(0.0, ge=0.0, le=1.0)

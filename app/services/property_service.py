@@ -182,18 +182,20 @@ async def search_properties(
         query = query.where(Property.address_dong == parsed.address_dong)
     if parsed.building_name:
         escaped = _escape_like(parsed.building_name)
-        query = query.where(Property.building_name.ilike(f"%{escaped}%"))
+        query = query.where(Property.building_name.ilike(f"%{escaped}%", escape="\\"))
     if parsed.area_pyeong:
+        min_area = max(0.1, parsed.area_pyeong - AREA_MARGIN_PYEONG)
         query = query.where(
             Property.area_pyeong.between(
-                parsed.area_pyeong - AREA_MARGIN_PYEONG,
+                min_area,
                 parsed.area_pyeong + AREA_MARGIN_PYEONG,
             )
         )
     if parsed.price_main:
         margin = int(parsed.price_main * PRICE_MARGIN_RATIO)
+        min_price = max(0, parsed.price_main - margin)
         query = query.where(
-            Property.price_main.between(parsed.price_main - margin, parsed.price_main + margin)
+            Property.price_main.between(min_price, parsed.price_main + margin)
         )
 
     query = query.order_by(Property.created_at.desc()).limit(SEARCH_MAX_RESULTS)
