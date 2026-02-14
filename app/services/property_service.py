@@ -29,7 +29,9 @@ async def get_or_create_agent(db: AsyncSession, kakao_user_id: str) -> Agent:
             result = await db.execute(
                 select(Agent).where(Agent.kakao_user_id == kakao_user_id)
             )
-            agent = result.scalar_one()
+            agent = result.scalar_one_or_none()
+            if agent is None:
+                raise RuntimeError(f"Agent 생성/조회 실패: kakao_user_id={kakao_user_id}")
     return agent
 
 
@@ -40,6 +42,7 @@ async def create_property(
     db.add(prop)
     await db.commit()
     await db.refresh(prop)
+    logger.info("매물 생성: id=%s, agent=%s", prop.id, agent_id)
     return prop
 
 
@@ -63,6 +66,7 @@ async def create_property_from_parse(
     db.add(prop)
     await db.commit()
     await db.refresh(prop)
+    logger.info("매물 등록(파싱): id=%s, agent=%s, type=%s", prop.id, agent_id, parsed.transaction_type)
     return prop
 
 
@@ -129,6 +133,7 @@ async def delete_property(
         return False
     prop.status = "deleted"
     await db.commit()
+    logger.info("매물 삭제: id=%s, agent=%s", property_id, agent_id)
     return True
 
 

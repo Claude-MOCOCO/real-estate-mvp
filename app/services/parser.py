@@ -94,6 +94,10 @@ class PropertyParser:
                 timeout=10,
             )
 
+            if not response.choices:
+                logger.error("AI 응답에 choices가 비어있습니다")
+                raise ValueError("AI 응답이 비어있습니다")
+
             content = response.choices[0].message.content
             if not content:
                 raise ValueError("AI 응답이 비어있습니다")
@@ -101,14 +105,14 @@ class PropertyParser:
             return ParseResult(**data)
 
         except json.JSONDecodeError:
-            logger.error("AI 파싱 결과 JSON 디코딩 실패: %s", content)
+            logger.error("AI 파싱 결과 JSON 디코딩 실패: %s", content[:200] if content else "None")
             return ParseResult(
                 intent="unknown",
                 confidence=0.0,
                 clarification_needed="말씀하신 내용을 이해하지 못했어요. 다시 한번 말씀해주시겠어요?",
             )
         except Exception as e:
-            logger.error("AI 파싱 오류: %s", e)
+            logger.error("AI 파싱 오류: type=%s, detail=%s", type(e).__name__, e)
             return ParseResult(
                 intent="unknown",
                 confidence=0.0,

@@ -35,6 +35,8 @@ async def handle_utterance(db: AsyncSession, kakao_user_id: str, utterance: str)
         parsed.intent, parsed.confidence, kakao_user_id,
     )
 
+    logger.info("핸들러 진입: intent=%s, agent=%s", parsed.intent, agent.id)
+
     if parsed.intent == "register":
         return await _handle_register(db, agent.id, parsed, utterance)
     elif parsed.intent == "search":
@@ -84,6 +86,7 @@ async def _handle_search(db, agent_id, parsed: ParseResult) -> str:
     else:
         properties = await search_properties(db, agent_id, parsed)
 
+    logger.info("검색 결과: %d건, agent=%s", len(properties), agent_id)
     return format_search_results(properties)
 
 
@@ -100,6 +103,7 @@ async def _handle_delete(db, agent_id, parsed: ParseResult) -> str:
 
     # 조건으로 매물 검색
     matches = await search_properties(db, agent_id, parsed)
+    logger.info("삭제 대상 검색: %d건, agent=%s", len(matches), agent_id)
 
     if not matches:
         return "삭제할 매물을 찾지 못했어요. 조건을 다시 확인해주세요."

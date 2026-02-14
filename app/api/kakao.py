@@ -15,11 +15,27 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/kakao", tags=["kakao"])
 
 
+async def _send_error_callback(callback_url: str, kakao_user_id: str, message: str):
+    """에러 응답을 콜백 URL로 전송"""
+    try:
+        error_response = KakaoResponse.text(message)
+        async with httpx.AsyncClient(timeout=5) as client:
+            await client.post(callback_url, json=error_response.model_dump(exclude_none=True))
+    except Exception:
+        logger.error("에러 콜백 전송 실패: user=%s", kakao_user_id)
+
+
 async def _process_and_callback(
     callback_url: str, kakao_user_id: str, utterance: str
 ):
-    """비동기 처리 후 콜백 URL로 응답 전송 (독립 DB 세션 사용, 30초 타임아웃)"""
-    db = await get_new_session()
+    """비동기 처리 후 콜백 URL로 응답 전송 (독립 DB 세션 사용, 25초 타임아웃)"""
+    try:
+        db = await get_new_session()
+    except Exception as e:
+        logger.error("DB 세션 생성 실패: %s, user=%s", e, kakao_user_id)
+        await _send_error_callback(callback_url, kakao_user_id, "죄송해요, 일시적인 오류가 발생했어요. 다시 시도해주세요.")
+        return
+
     try:
         async with db:
             response_text = await asyncio.wait_for(
@@ -34,20 +50,10 @@ async def _process_and_callback(
 
     except asyncio.TimeoutError:
         logger.error("백그라운드 처리 타임아웃(25초): user=%s", kakao_user_id)
-        try:
-            error_response = KakaoResponse.text("처리 시간이 초과됐어요. 잠시 후 다시 시도해주세요.")
-            async with httpx.AsyncClient(timeout=5) as client:
-                await client.post(callback_url, json=error_response.model_dump(exclude_none=True))
-        except Exception:
-            logger.error("타임아웃 에러 콜백 실패: user=%s", kakao_user_id)
+        await _send_error_callback(callback_url, kakao_user_id, "처리 시간이 초과됐어요. 잠시 후 다시 시도해주세요.")
     except Exception as e:
-        logger.error("콜백 처리 실패: %s, user=%s", e, kakao_user_id)
-        try:
-            error_response = KakaoResponse.text("죄송해요, 처리 중 오류가 발생했어요. 다시 시도해주세요.")
-            async with httpx.AsyncClient(timeout=5) as client:
-                await client.post(callback_url, json=error_response.model_dump(exclude_none=True))
-        except Exception:
-            logger.error("에러 콜백도 실패: user=%s", kakao_user_id)
+        logger.error("콜백 처리 실패: type=%s, detail=%s, user=%s", type(e).__name__, e, kakao_user_id)
+        await _send_error_callback(callback_url, kakao_user_id, "죄송해요, 처리 중 오류가 발생했어요. 다시 시도해주세요.")
 
 
 @router.post("/skill")
