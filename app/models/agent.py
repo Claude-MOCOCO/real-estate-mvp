@@ -15,8 +15,8 @@ class Agent(UUIDMixin, TimestampMixin, Base):
     name: Mapped[str | None] = mapped_column(String(50))
 
     properties: Mapped[list["Property"]] = relationship(  # noqa: F821
-        back_populates="agent", lazy="selectin"
+        back_populates="agent", lazy="select"
     )
     memos: Mapped[list["Memo"]] = relationship(  # noqa: F821
-        back_populates="agent", lazy="selectin"
+        back_populates="agent", lazy="select"
     )

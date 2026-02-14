@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,4 +18,7 @@ async def health_check(db: AsyncSession = Depends(get_db)):
         return {"status": "ok", "database": "connected"}
     except Exception as e:
         logger.error("Health check DB 연결 실패: %s", e)
-        return {"status": "degraded", "database": "disconnected"}
+        return JSONResponse(
+            status_code=503,
+            content={"status": "degraded", "database": "disconnected"},
+        )

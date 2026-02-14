@@ -1,8 +1,8 @@
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, Text
+from sqlalchemy import Boolean, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
 
@@ -20,3 +20,9 @@ class Memo(UUIDMixin, TimestampMixin, Base):
 
     # Relationships
     agent: Mapped["Agent"] = relationship(back_populates="memos")  # noqa: F821
+
+    @validates("content")
+    def validate_content(self, key: str, value: str) -> str:
+        if len(value) > 5000:
+            raise ValueError("메모 내용은 5000자를 초과할 수 없습니다.")
+        return value
