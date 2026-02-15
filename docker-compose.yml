@@ -5,13 +5,13 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-real_estate}
       POSTGRES_USER: ${POSTGRES_USER:-mcp_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 환경변수를 설정하세요}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mcp_user} -d ${POSTGRES_DB:-real_estate}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-mcp_user} -d $${POSTGRES_DB:-real_estate}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,7 +26,7 @@ services:
     ports:
       - "${APP_PORT:-8000}:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mcp_user}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-real_estate}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mcp_user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-real_estate}
       UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
       UVICORN_TIMEOUT_KEEP_ALIVE: ${UVICORN_TIMEOUT_KEEP_ALIVE:-65}
       UVICORN_LIMIT_MAX_REQUESTS: ${UVICORN_LIMIT_MAX_REQUESTS:-10000}

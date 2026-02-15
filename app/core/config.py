@@ -38,11 +38,21 @@ class Settings(BaseSettings):
                     "환경변수를 설정하세요."
                 )
             logger.warning("OPENAI_API_KEY가 설정되지 않았습니다. AI 파싱 기능이 동작하지 않습니다.")
-        if self.environment == "production" and "*" in self.cors_origins:
-            raise ValueError(
-                "운영 환경에서는 CORS_ORIGINS에 '*'를 사용할 수 없습니다. "
-                "명시적 오리진을 설정하세요."
-            )
+        if self.environment == "production":
+            if "*" in self.cors_origins:
+                raise ValueError(
+                    "운영 환경에서는 CORS_ORIGINS에 '*'를 사용할 수 없습니다. "
+                    "명시적 오리진을 설정하세요."
+                )
+            if not self.api_key:
+                raise ValueError(
+                    "운영 환경에서 API_KEY는 필수입니다. "
+                    "최소 32자 이상의 랜덤 문자열을 설정하세요."
+                )
+            if not self.kakao_skill_secret:
+                raise ValueError(
+                    "운영 환경에서 KAKAO_SKILL_SECRET은 필수입니다."
+                )
         return self
 
 

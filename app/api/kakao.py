@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import time
+from hmac import compare_digest
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -56,7 +57,7 @@ async def verify_kakao_skill_secret(request: Request):
     if not settings.kakao_skill_secret:
         return
     header_secret = request.headers.get("X-Kakao-Skill-Secret", "")
-    if header_secret != settings.kakao_skill_secret:
+    if not header_secret or not compare_digest(header_secret, settings.kakao_skill_secret):
         logger.warning("카카오 스킬 시크릿 검증 실패: ip=%s", request.client.host if request.client else "unknown")
         raise HTTPException(status_code=401, detail="Invalid skill secret")
 
