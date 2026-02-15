@@ -1,6 +1,7 @@
 """사용자 응답 메시지 포맷팅"""
 
-from app.models.property import Property
+from typing import Any
+
 from app.schemas.property import ParseResult
 
 
@@ -18,7 +19,7 @@ def format_price(amount: int | None) -> str:
     return f"{amount:,}원"
 
 
-def format_property_summary(prop: Property) -> str:
+def format_property_summary(prop: Any) -> str:
     parts = []
     if prop.transaction_type:
         parts.append(f"[{prop.transaction_type}]")
@@ -76,7 +77,7 @@ def format_registered_summary(parsed: ParseResult) -> str:
     return "\n".join(lines)
 
 
-def format_search_results(properties: list[Property], is_full_list: bool = False) -> str:
+def format_search_results(properties: list[Any], is_full_list: bool = False) -> str:
     if not properties:
         if is_full_list:
             return "등록된 매물이 없어요. 매물을 등록해보세요!\n\n예시: '강남구 역삼동 30평 전세 3억 등록해줘'"

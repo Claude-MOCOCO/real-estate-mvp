@@ -1,4 +1,8 @@
-"""개인비서 핵심 로직 — 자연어 입력을 해석하고 적절한 행동을 수행"""
+"""개인비서 핵심 로직 — 자연어 입력을 해석하고 적절한 행동을 수행
+
+하위 호환성 유지: 기존 함수 시그니처를 유지하면서 테스트 patch 경로가 동작하도록 보장.
+유스케이스 클래스(AssistantUseCase)는 새로운 진입점(API에서 직접 사용 가능)으로 re-export.
+"""
 
 import logging
 
@@ -22,13 +26,19 @@ from app.services.responder import (
     format_search_results,
 )
 
+# 유스케이스 re-export — 새로운 코드에서 직접 사용 가능
+from app.application.use_cases import AssistantUseCase  # noqa: F401
+from app.application.use_cases import _summarize_parsed  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
-# UX 상수
-CONFIDENCE_THRESHOLD = 0.3
-MAX_DELETE_OPTIONS = 5
-MEMO_PREVIEW_LENGTH = 40
-MAX_MEMO_DISPLAY = 10
+# UX 상수 (하위 호환 re-export)
+from app.application.use_cases import (  # noqa: F401, E402
+    CONFIDENCE_THRESHOLD,
+    MAX_DELETE_OPTIONS,
+    MEMO_PREVIEW_LENGTH,
+    MAX_MEMO_DISPLAY,
+)
 
 
 async def handle_utterance(db: AsyncSession, kakao_user_id: str, utterance: str) -> str:
@@ -168,18 +178,3 @@ async def _handle_unknown(db, agent_id, parsed: ParseResult, raw_input: str) -> 
             "매물 등록 예시: '강남구 역삼동 30평 전세 3억 등록해줘'\n"
             "매물 검색 예시: '역삼동 월세 뭐 있어?'"
         )
-
-
-def _summarize_parsed(parsed: ParseResult) -> str:
-    parts = []
-    if parsed.address_gugun:
-        parts.append(parsed.address_gugun)
-    if parsed.address_dong:
-        parts.append(parsed.address_dong)
-    if parsed.area_pyeong:
-        parts.append(f"{parsed.area_pyeong}평")
-    if parsed.price_main:
-        parts.append(format_price(parsed.price_main))
-    if parsed.building_name:
-        parts.append(parsed.building_name)
-    return ", ".join(parts) if parts else "(추출된 정보 없음)"
