@@ -47,6 +47,22 @@
 5. 의도(intent)에 따라 매물 등록/검색/삭제 또는 메모 저장 수행
 6. 결과를 카카오 챗봇 응답 포맷(v2.0)으로 반환
 
+### 아키텍처 패턴
+
+헥사고날 아키텍처(포트앤어댑터) 적용:
+
+```
+app/
+├── domain/          # 도메인 계층 — 엔티티, 값 객체, 포트(인터페이스)
+├── application/     # 유스케이스 계층 — AssistantUseCase
+├── adapters/        # 어댑터 계층 — SQLAlchemy, OpenAI, httpx 구현체
+├── services/        # 하위호환 래퍼 (기존 import 경로 유지)
+├── schemas/         # Pydantic 요청/응답 스키마
+├── models/          # SQLAlchemy ORM 모델
+├── api/             # FastAPI 라우터
+└── core/            # 설정, DB, 인증, 미들웨어, 로깅
+```
+
 ### 기술 스택
 
 | 구분 | 기술 | 버전 |
