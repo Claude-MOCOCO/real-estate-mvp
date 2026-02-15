@@ -5,6 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import verify_api_key
 from app.core.database import get_db
 from app.schemas.property import (
     PropertyCreate,
@@ -19,7 +20,11 @@ from app.services.property_service import (
     update_property,
 )
 
-router = APIRouter(prefix="/api/properties", tags=["properties"])
+router = APIRouter(
+    prefix="/api/properties",
+    tags=["properties"],
+    dependencies=[Depends(verify_api_key)],
+)
 
 
 @router.get("/{agent_id}", response_model=list[PropertyResponse])

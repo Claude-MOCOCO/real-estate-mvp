@@ -1,0 +1,50 @@
+# Git
+.git
+.gitignore
+
+# Python 캐시/빌드 아티팩트
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+
+# 가상환경
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 테스트/개발
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker (자기 자신 제외)
+docker-compose.yml
+docker-compose*.yml
+
+# 환경변수 (빌드 컨텍스트에 포함 금지)
+.env
+.env.*
+
+# 문서
+*.md
+LICENSE
+
+# Claude/AI 설정
+.claude/
+prompts/

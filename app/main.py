@@ -1,23 +1,21 @@
 import logging
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from starlette.middleware.cors import CORSMiddleware
 
 from app.api.health import router as health_router
 from app.api.kakao import router as kakao_router
 from app.api.properties import router as properties_router
+from app.core.config import settings
 from app.core.database import engine
+from app.core.logging import setup_logging
+from app.core.middleware import RequestIDMiddleware
 from app.schemas.kakao import KakaoResponse
 
+setup_logging(environment=settings.environment, log_level=settings.log_level)
 logger = logging.getLogger(__name__)
-
-_log_level = os.getenv("LOG_LEVEL", "INFO").upper()
-logging.basicConfig(
-    level=getattr(logging, _log_level, logging.INFO),
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
 
 
 @asynccontextmanager
@@ -33,6 +31,15 @@ app = FastAPI(
     description="공인중개사 전용 AI 비서 — 카카오톡 채널봇 + FastAPI",
     version="0.1.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(RequestIDMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
