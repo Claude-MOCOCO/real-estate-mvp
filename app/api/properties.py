@@ -3,21 +3,14 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.dependencies import get_property_use_case
+from app.application.use_cases import PropertyUseCase
 from app.core.auth import verify_api_key
-from app.core.database import get_db
 from app.schemas.property import (
     PropertyCreate,
     PropertyResponse,
     PropertyUpdate,
-)
-from app.services.property_service import (
-    create_property,
-    delete_property,
-    get_property,
-    list_properties,
-    update_property,
 )
 
 router = APIRouter(
@@ -34,27 +27,27 @@ async def get_properties(
     address_gugun: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    db: AsyncSession = Depends(get_db),
+    uc: PropertyUseCase = Depends(get_property_use_case),
 ):
-    return await list_properties(db, agent_id, transaction_type, address_gugun, limit=limit, offset=offset)
+    return await uc.list_properties(agent_id, transaction_type, address_gugun, limit=limit, offset=offset)
 
 
 @router.post("/{agent_id}", response_model=PropertyResponse, status_code=201)
 async def create_property_endpoint(
     agent_id: uuid.UUID,
     data: PropertyCreate,
-    db: AsyncSession = Depends(get_db),
+    uc: PropertyUseCase = Depends(get_property_use_case),
 ):
-    return await create_property(db, agent_id, data)
+    return await uc.create_property(agent_id, data)
 
 
 @router.get("/{agent_id}/{property_id}", response_model=PropertyResponse)
 async def get_property_endpoint(
     agent_id: uuid.UUID,
     property_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    uc: PropertyUseCase = Depends(get_property_use_case),
 ):
-    prop = await get_property(db, agent_id, property_id)
+    prop = await uc.get_property(agent_id, property_id)
     if prop is None:
         raise HTTPException(status_code=404, detail="매물을 찾을 수 없습니다")
     return prop
@@ -65,9 +58,9 @@ async def update_property_endpoint(
     agent_id: uuid.UUID,
     property_id: uuid.UUID,
     data: PropertyUpdate,
-    db: AsyncSession = Depends(get_db),
+    uc: PropertyUseCase = Depends(get_property_use_case),
 ):
-    prop = await update_property(db, agent_id, property_id, data)
+    prop = await uc.update_property(agent_id, property_id, data)
     if prop is None:
         raise HTTPException(status_code=404, detail="매물을 찾을 수 없습니다")
     return prop
@@ -77,8 +70,8 @@ async def update_property_endpoint(
 async def delete_property_endpoint(
     agent_id: uuid.UUID,
     property_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    uc: PropertyUseCase = Depends(get_property_use_case),
 ):
-    success = await delete_property(db, agent_id, property_id)
+    success = await uc.delete_property(agent_id, property_id)
     if not success:
         raise HTTPException(status_code=404, detail="매물을 찾을 수 없습니다")

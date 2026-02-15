@@ -11,7 +11,7 @@ from uuid import UUID
 from app.domain.ports.repositories import AgentRepository, PropertyRepository, MemoRepository
 from app.domain.ports.parser import ParserPort
 from app.domain.value_objects import ParseResult, MemoCreate
-from app.services.responder import (
+from app.domain.services.responder import (
     format_price,
     format_property_summary,
     format_registered_summary,
@@ -150,6 +150,40 @@ class AssistantUseCase:
                 "매물 등록 예시: '강남구 역삼동 30평 전세 3억 등록해줘'\n"
                 "매물 검색 예시: '역삼동 월세 뭐 있어?'"
             )
+
+
+class PropertyUseCase:
+    """매물 CRUD 유스케이스 — Properties API용"""
+
+    def __init__(
+        self,
+        property_repo: PropertyRepository,
+    ):
+        self.property_repo = property_repo
+
+    async def list_properties(
+        self,
+        agent_id: UUID,
+        transaction_type: str | None = None,
+        address_gugun: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ):
+        return await self.property_repo.list_by_agent(
+            agent_id, transaction_type, address_gugun, limit=limit, offset=offset,
+        )
+
+    async def create_property(self, agent_id: UUID, data):
+        return await self.property_repo.create(agent_id, data)
+
+    async def get_property(self, agent_id: UUID, property_id: UUID):
+        return await self.property_repo.get(agent_id, property_id)
+
+    async def update_property(self, agent_id: UUID, property_id: UUID, data):
+        return await self.property_repo.update(agent_id, property_id, data)
+
+    async def delete_property(self, agent_id: UUID, property_id: UUID) -> bool:
+        return await self.property_repo.delete(agent_id, property_id)
 
 
 def _summarize_parsed(parsed: ParseResult) -> str:

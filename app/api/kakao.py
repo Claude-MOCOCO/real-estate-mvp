@@ -9,10 +9,17 @@ import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.openai_parser import openai_parser
+from app.adapters.sqlalchemy_repository import (
+    SQLAlchemyAgentRepository,
+    SQLAlchemyMemoRepository,
+    SQLAlchemyPropertyRepository,
+)
+from app.application.dependencies import get_assistant_use_case
+from app.application.use_cases import AssistantUseCase
 from app.core.config import settings
 from app.core.database import get_db, get_new_session
 from app.schemas.kakao import KakaoRequest, KakaoResponse
-from app.services.assistant import handle_utterance
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/kakao", tags=["kakao"])
@@ -85,8 +92,14 @@ async def _process_and_callback(
 
     try:
         async with db:
+            use_case = AssistantUseCase(
+                agent_repo=SQLAlchemyAgentRepository(db),
+                property_repo=SQLAlchemyPropertyRepository(db),
+                memo_repo=SQLAlchemyMemoRepository(db),
+                parser=openai_parser,
+            )
             response_text = await asyncio.wait_for(
-                handle_utterance(db, kakao_user_id, utterance),
+                use_case.handle_utterance(kakao_user_id, utterance),
                 timeout=25.0,
             )
             kakao_response = KakaoResponse.text(response_text)
@@ -107,7 +120,7 @@ async def _process_and_callback(
 async def kakao_skill(
     request: KakaoRequest,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db),
+    use_case: AssistantUseCase = Depends(get_assistant_use_case),
 ):
     """카카오 챗봇 스킬 엔드포인트
 
@@ -138,5 +151,5 @@ async def kakao_skill(
         )
         return KakaoResponse.callback_pending(utterance).model_dump(exclude_none=True)
 
-    response_text = await handle_utterance(db, kakao_user_id, utterance)
+    response_text = await use_case.handle_utterance(kakao_user_id, utterance)
     return KakaoResponse.text(response_text).model_dump(exclude_none=True)

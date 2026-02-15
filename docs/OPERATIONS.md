@@ -49,19 +49,53 @@
 
 ### 아키텍처 패턴
 
-헥사고날 아키텍처(포트앤어댑터) 적용:
+**헥사고날 아키텍처(포트 앤 어댑터)** 전면 적용:
 
 ```
 app/
-├── domain/          # 도메인 계층 — 엔티티, 값 객체, 포트(인터페이스)
-├── application/     # 유스케이스 계층 — AssistantUseCase
-├── adapters/        # 어댑터 계층 — SQLAlchemy, OpenAI, httpx 구현체
-├── services/        # 하위호환 래퍼 (기존 import 경로 유지)
-├── schemas/         # Pydantic 요청/응답 스키마
-├── models/          # SQLAlchemy ORM 모델
-├── api/             # FastAPI 라우터
-└── core/            # 설정, DB, 인증, 미들웨어, 로깅
+├── domain/              # 도메인 계층 — 순수 비즈니스 규칙 (외부 의존성 없음)
+│   ├── entities.py      #   도메인 엔티티 (Agent, Property, Memo)
+│   ├── value_objects.py  #   값 객체 및 열거형 (ParseResult, TransactionType)
+│   ├── ports/           #   포트 = 추상 인터페이스 (ABC)
+│   │   ├── repositories.py  # AgentRepository, PropertyRepository, MemoRepository
+│   │   ├── parser.py        # ParserPort
+│   │   └── callback.py      # CallbackPort
+│   └── services/        #   순수 도메인 서비스 (외부 의존성 없음)
+│       └── responder.py     # 메시지 포맷팅 (format_price, format_property_summary 등)
+│
+├── application/         # 유스케이스 계층 — 포트에만 의존, 구체 구현체를 모름
+│   ├── use_cases.py     #   AssistantUseCase (챗봇 흐름), PropertyUseCase (CRUD)
+│   └── dependencies.py  #   FastAPI DI 팩토리 (Composition Root)
+│
+├── adapters/            # 어댑터 계층 — 포트의 구체 구현체
+│   ├── sqlalchemy_repository.py  # Agent/Property/Memo 저장소 구현
+│   ├── openai_parser.py          # OpenAI GPT 기반 파서 구현
+│   └── httpx_callback.py         # httpx 기반 콜백 전송 구현
+│
+├── api/                 # 프레젠테이션 계층 — FastAPI 라우터
+│   ├── kakao.py         #   카카오 스킬 엔드포인트 (DI로 AssistantUseCase 주입)
+│   ├── properties.py    #   매물 CRUD API (DI로 PropertyUseCase 주입)
+│   └── health.py        #   헬스체크
+│
+├── models/              # ORM 계층 — SQLAlchemy 테이블 정의
+├── schemas/             # DTO — Pydantic 요청/응답 스키마
+├── core/                # 인프라 — 설정, DB, 인증, 미들웨어, 로깅
+└── services/            # 하위호환 래퍼 (레거시 import 경로 유지용, 로직 없음)
 ```
+
+**의존성 방향 (안쪽으로만 의존):**
+
+```
+API(Presentation) → Application(UseCase) → Domain(Entities/Ports)
+                                               ↑
+Adapters(Implementations) ─────────────────────┘
+```
+
+- **Domain**: 외부 라이브러리에 의존하지 않음 (순수 Python + Pydantic)
+- **Application**: 도메인 포트(ABC)에만 의존, 구체 구현체를 모름
+- **Adapters**: 도메인 포트를 구현하며, 외부 라이브러리(SQLAlchemy, OpenAI 등)에 의존
+- **API**: `dependencies.py`(Composition Root)에서 어댑터 → 포트 바인딩 수행
+- 어댑터 교체 시 도메인/유스케이스 코드 변경 불필요
 
 ### 기술 스택
 

@@ -1,10 +1,11 @@
 """카카오 스킬 API 엔드포인트 테스트"""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.application.dependencies import get_assistant_use_case
 from app.main import app
 
 
@@ -22,9 +23,12 @@ def test_health_check(client):
 
 def test_kakao_skill_direct_response(client):
     """콜백 URL 없는 직접 응답 모드"""
-    with patch("app.api.kakao.handle_utterance", new_callable=AsyncMock) as mock:
-        mock.return_value = "테스트 응답입니다"
+    mock_use_case = MagicMock()
+    mock_use_case.handle_utterance = AsyncMock(return_value="테스트 응답입니다")
 
+    app.dependency_overrides[get_assistant_use_case] = lambda: mock_use_case
+
+    try:
         response = client.post(
             "/kakao/skill",
             json={
@@ -35,10 +39,12 @@ def test_kakao_skill_direct_response(client):
             },
         )
 
-    assert response.status_code == 200
-    data = response.json()
-    assert data["version"] == "2.0"
-    assert data["template"]["outputs"][0]["simpleText"]["text"] == "테스트 응답입니다"
+        assert response.status_code == 200
+        data = response.json()
+        assert data["version"] == "2.0"
+        assert data["template"]["outputs"][0]["simpleText"]["text"] == "테스트 응답입니다"
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_kakao_skill_callback_mode(client):

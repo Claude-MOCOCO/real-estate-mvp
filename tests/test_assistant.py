@@ -1,23 +1,41 @@
-"""개인비서 핵심 로직 테스트 — Mock DB/Parser 기반"""
+"""개인비서 핵심 유스케이스 테스트 — Mock Repository/Parser 기반
 
-from unittest.mock import AsyncMock, MagicMock, patch
+헥사고날 아키텍처: UseCase에 Mock 포트를 주입하여 순수 비즈니스 로직만 테스트.
+"""
+
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.schemas.property import ParseResult
-from app.services.assistant import (
+from app.application.use_cases import (
     CONFIDENCE_THRESHOLD,
     MAX_DELETE_OPTIONS,
     MAX_MEMO_DISPLAY,
-    _handle_update,
+    AssistantUseCase,
     _summarize_parsed,
-    handle_utterance,
 )
+from app.domain.value_objects import ParseResult
+
+
+def _make_use_case(
+    agent_repo=None,
+    property_repo=None,
+    memo_repo=None,
+    parser=None,
+):
+    """Mock 포트를 주입하여 UseCase 인스턴스 생성"""
+    return AssistantUseCase(
+        agent_repo=agent_repo or AsyncMock(),
+        property_repo=property_repo or AsyncMock(),
+        memo_repo=memo_repo or AsyncMock(),
+        parser=parser or AsyncMock(),
+    )
 
 
 def test_handle_update():
+    uc = _make_use_case()
     parsed = ParseResult(intent="update", confidence=0.9)
-    result = _handle_update(parsed)
+    result = uc._handle_update(parsed)
     assert "준비 중" in result
     assert "삭제 후 다시 등록" in result
 
@@ -48,7 +66,6 @@ def test_summarize_parsed_empty():
 
 @pytest.mark.asyncio
 async def test_handle_utterance_register():
-    mock_db = AsyncMock()
     mock_agent = MagicMock()
     mock_agent.id = "agent-123"
 
@@ -61,42 +78,49 @@ async def test_handle_utterance_register():
         confidence=0.9,
     )
 
-    with (
-        patch("app.services.assistant.get_or_create_agent", new_callable=AsyncMock, return_value=mock_agent),
-        patch("app.services.assistant.parser") as mock_parser,
-        patch("app.services.assistant.create_property_from_parse", new_callable=AsyncMock) as mock_create,
-    ):
-        mock_parser.parse = AsyncMock(return_value=parsed)
-        mock_create.return_value = MagicMock()
+    agent_repo = AsyncMock()
+    agent_repo.get_or_create.return_value = mock_agent
 
-        result = await handle_utterance(mock_db, "test_user", "강남구 역삼동 30평 전세 3억 등록")
+    property_repo = AsyncMock()
+    property_repo.create_from_parse.return_value = MagicMock()
+
+    parser = AsyncMock()
+    parser.parse.return_value = parsed
+
+    uc = _make_use_case(
+        agent_repo=agent_repo,
+        property_repo=property_repo,
+        parser=parser,
+    )
+
+    result = await uc.handle_utterance("test_user", "강남구 역삼동 30평 전세 3억 등록")
 
     assert "등록됐어요" in result
-    mock_create.assert_called_once()
+    property_repo.create_from_parse.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_handle_utterance_register_low_confidence():
-    mock_db = AsyncMock()
     mock_agent = MagicMock()
     mock_agent.id = "agent-123"
 
     parsed = ParseResult(intent="register", confidence=0.1)
 
-    with (
-        patch("app.services.assistant.get_or_create_agent", new_callable=AsyncMock, return_value=mock_agent),
-        patch("app.services.assistant.parser") as mock_parser,
-    ):
-        mock_parser.parse = AsyncMock(return_value=parsed)
+    agent_repo = AsyncMock()
+    agent_repo.get_or_create.return_value = mock_agent
 
-        result = await handle_utterance(mock_db, "test_user", "뭔가 이상한 입력")
+    parser = AsyncMock()
+    parser.parse.return_value = parsed
+
+    uc = _make_use_case(agent_repo=agent_repo, parser=parser)
+
+    result = await uc.handle_utterance("test_user", "뭔가 이상한 입력")
 
     assert "충분히 파악하지 못했어요" in result
 
 
 @pytest.mark.asyncio
 async def test_handle_utterance_register_no_transaction_type():
-    mock_db = AsyncMock()
     mock_agent = MagicMock()
     mock_agent.id = "agent-123"
 
@@ -107,20 +131,21 @@ async def test_handle_utterance_register_no_transaction_type():
         confidence=0.9,
     )
 
-    with (
-        patch("app.services.assistant.get_or_create_agent", new_callable=AsyncMock, return_value=mock_agent),
-        patch("app.services.assistant.parser") as mock_parser,
-    ):
-        mock_parser.parse = AsyncMock(return_value=parsed)
+    agent_repo = AsyncMock()
+    agent_repo.get_or_create.return_value = mock_agent
 
-        result = await handle_utterance(mock_db, "test_user", "강남구 30평 3억 등록")
+    parser = AsyncMock()
+    parser.parse.return_value = parsed
+
+    uc = _make_use_case(agent_repo=agent_repo, parser=parser)
+
+    result = await uc.handle_utterance("test_user", "강남구 30평 3억 등록")
 
     assert "거래 유형" in result
 
 
 @pytest.mark.asyncio
 async def test_handle_utterance_search_empty():
-    mock_db = AsyncMock()
     mock_agent = MagicMock()
     mock_agent.id = "agent-123"
 
@@ -130,41 +155,55 @@ async def test_handle_utterance_search_empty():
         confidence=0.9,
     )
 
-    with (
-        patch("app.services.assistant.get_or_create_agent", new_callable=AsyncMock, return_value=mock_agent),
-        patch("app.services.assistant.parser") as mock_parser,
-        patch("app.services.assistant.search_properties", new_callable=AsyncMock, return_value=[]),
-    ):
-        mock_parser.parse = AsyncMock(return_value=parsed)
+    agent_repo = AsyncMock()
+    agent_repo.get_or_create.return_value = mock_agent
 
-        result = await handle_utterance(mock_db, "test_user", "강남구 매물 있어?")
+    property_repo = AsyncMock()
+    property_repo.search.return_value = []
+
+    parser = AsyncMock()
+    parser.parse.return_value = parsed
+
+    uc = _make_use_case(
+        agent_repo=agent_repo,
+        property_repo=property_repo,
+        parser=parser,
+    )
+
+    result = await uc.handle_utterance("test_user", "강남구 매물 있어?")
 
     assert "없어요" in result
 
 
 @pytest.mark.asyncio
 async def test_handle_utterance_delete_not_found():
-    mock_db = AsyncMock()
     mock_agent = MagicMock()
     mock_agent.id = "agent-123"
 
     parsed = ParseResult(intent="delete", address_gugun="강남구", confidence=0.9)
 
-    with (
-        patch("app.services.assistant.get_or_create_agent", new_callable=AsyncMock, return_value=mock_agent),
-        patch("app.services.assistant.parser") as mock_parser,
-        patch("app.services.assistant.search_properties", new_callable=AsyncMock, return_value=[]),
-    ):
-        mock_parser.parse = AsyncMock(return_value=parsed)
+    agent_repo = AsyncMock()
+    agent_repo.get_or_create.return_value = mock_agent
 
-        result = await handle_utterance(mock_db, "test_user", "강남구 매물 삭제")
+    property_repo = AsyncMock()
+    property_repo.search.return_value = []
+
+    parser = AsyncMock()
+    parser.parse.return_value = parsed
+
+    uc = _make_use_case(
+        agent_repo=agent_repo,
+        property_repo=property_repo,
+        parser=parser,
+    )
+
+    result = await uc.handle_utterance("test_user", "강남구 매물 삭제")
 
     assert "찾지 못했어요" in result
 
 
 @pytest.mark.asyncio
 async def test_handle_utterance_delete_single():
-    mock_db = AsyncMock()
     mock_agent = MagicMock()
     mock_agent.id = "agent-123"
 
@@ -180,76 +219,105 @@ async def test_handle_utterance_delete_single():
 
     parsed = ParseResult(intent="delete", address_gugun="강남구", confidence=0.9)
 
-    with (
-        patch("app.services.assistant.get_or_create_agent", new_callable=AsyncMock, return_value=mock_agent),
-        patch("app.services.assistant.parser") as mock_parser,
-        patch("app.services.assistant.search_properties", new_callable=AsyncMock, return_value=[mock_prop]),
-        patch("app.services.assistant.delete_property", new_callable=AsyncMock, return_value=True),
-    ):
-        mock_parser.parse = AsyncMock(return_value=parsed)
+    agent_repo = AsyncMock()
+    agent_repo.get_or_create.return_value = mock_agent
 
-        result = await handle_utterance(mock_db, "test_user", "강남구 전세 3억 삭제")
+    property_repo = AsyncMock()
+    property_repo.search.return_value = [mock_prop]
+    property_repo.delete.return_value = True
+
+    parser = AsyncMock()
+    parser.parse.return_value = parsed
+
+    uc = _make_use_case(
+        agent_repo=agent_repo,
+        property_repo=property_repo,
+        parser=parser,
+    )
+
+    result = await uc.handle_utterance("test_user", "강남구 전세 3억 삭제")
 
     assert "삭제됐어요" in result
 
 
 @pytest.mark.asyncio
 async def test_handle_utterance_unknown_saves_memo():
-    mock_db = AsyncMock()
     mock_agent = MagicMock()
     mock_agent.id = "agent-123"
 
     mock_memo = MagicMock()
     parsed = ParseResult(intent="unknown", confidence=0.1)
 
-    with (
-        patch("app.services.assistant.get_or_create_agent", new_callable=AsyncMock, return_value=mock_agent),
-        patch("app.services.assistant.parser") as mock_parser,
-        patch("app.services.assistant.create_memo", new_callable=AsyncMock, return_value=(mock_memo, True)),
-    ):
-        mock_parser.parse = AsyncMock(return_value=parsed)
+    agent_repo = AsyncMock()
+    agent_repo.get_or_create.return_value = mock_agent
 
-        result = await handle_utterance(mock_db, "test_user", "오늘 날씨 좋다")
+    memo_repo = AsyncMock()
+    memo_repo.create.return_value = (mock_memo, True)
+
+    parser = AsyncMock()
+    parser.parse.return_value = parsed
+
+    uc = _make_use_case(
+        agent_repo=agent_repo,
+        memo_repo=memo_repo,
+        parser=parser,
+    )
+
+    result = await uc.handle_utterance("test_user", "오늘 날씨 좋다")
 
     assert "메모로 저장" in result
 
 
 @pytest.mark.asyncio
 async def test_handle_utterance_unknown_duplicate_memo():
-    mock_db = AsyncMock()
     mock_agent = MagicMock()
     mock_agent.id = "agent-123"
 
     mock_memo = MagicMock()
     parsed = ParseResult(intent="unknown", confidence=0.1)
 
-    with (
-        patch("app.services.assistant.get_or_create_agent", new_callable=AsyncMock, return_value=mock_agent),
-        patch("app.services.assistant.parser") as mock_parser,
-        patch("app.services.assistant.create_memo", new_callable=AsyncMock, return_value=(mock_memo, False)),
-    ):
-        mock_parser.parse = AsyncMock(return_value=parsed)
+    agent_repo = AsyncMock()
+    agent_repo.get_or_create.return_value = mock_agent
 
-        result = await handle_utterance(mock_db, "test_user", "오늘 날씨 좋다")
+    memo_repo = AsyncMock()
+    memo_repo.create.return_value = (mock_memo, False)
+
+    parser = AsyncMock()
+    parser.parse.return_value = parsed
+
+    uc = _make_use_case(
+        agent_repo=agent_repo,
+        memo_repo=memo_repo,
+        parser=parser,
+    )
+
+    result = await uc.handle_utterance("test_user", "오늘 날씨 좋다")
 
     assert "이미 메모에 저장돼 있어요" in result
 
 
 @pytest.mark.asyncio
 async def test_handle_utterance_list_memo_empty():
-    mock_db = AsyncMock()
     mock_agent = MagicMock()
     mock_agent.id = "agent-123"
 
     parsed = ParseResult(intent="list_memo", confidence=0.9)
 
-    with (
-        patch("app.services.assistant.get_or_create_agent", new_callable=AsyncMock, return_value=mock_agent),
-        patch("app.services.assistant.parser") as mock_parser,
-        patch("app.services.assistant.list_memos", new_callable=AsyncMock, return_value=[]),
-    ):
-        mock_parser.parse = AsyncMock(return_value=parsed)
+    agent_repo = AsyncMock()
+    agent_repo.get_or_create.return_value = mock_agent
 
-        result = await handle_utterance(mock_db, "test_user", "메모 보여줘")
+    memo_repo = AsyncMock()
+    memo_repo.list_by_agent.return_value = []
+
+    parser = AsyncMock()
+    parser.parse.return_value = parsed
+
+    uc = _make_use_case(
+        agent_repo=agent_repo,
+        memo_repo=memo_repo,
+        parser=parser,
+    )
+
+    result = await uc.handle_utterance("test_user", "메모 보여줘")
 
     assert "없어요" in result
